@@ -1,91 +1,87 @@
-const cheerio = require('cheerio');
-const rp = require('request-promise');
+const express = require('express');
+const multer = require('multer');
 
-var sites = [
-    'https://www.ica.se/recept/grundrecept-vaffelsmet-292887/',
-    'https://www.coop.se/recept/vafflor-recept-pa-vaffelsmet'
-];
+const upload = multer();
+const app = express();
+const port = 3000;
 
-var promises = sites.map(function(url) {
-    return rp(url).then(function(htmlString) {
-        return parseRecipe(htmlString);
-    }).catch(function(err) {
-        console.log(err);
-        return null;
+const handlebars = require('express-handlebars');
+
+const low = require('lowdb');
+const FileSync = require('lowdb/adapters/FileSync');
+const adapter = new FileSync('db.json');
+const db = low(adapter);
+
+db.defaults({ parsed: {}, job_id: 1, jobs: [] })
+    .write()
+
+const parser = require('./recipe-parser');
+
+app.set('view engine', 'handlebars');
+
+app.engine('handlebars', handlebars());
+
+app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+    res.render('index', {
+        layout: false,
+        test: JSON.stringify({
+            test: 'hello world',
+        }),
     });
 });
 
-Promise.all(promises).then(function(r) {
-    r.forEach(function(recipe) {
-        console.dir(recipe);
-    });
-});
-
-function parseRecipe(html) {
-    const $ = cheerio.load(html);
-
-    var title = $("title").text().trim();
-
-    var ingredients = [];
-    var space = 0;
-
-    $('li').each(function() {
-        var s = $(this).text().replace(/[\n\r\s]+/g, " ").trim();
-        if (s == "") {
-            space++;
+app.post('/parse', upload.none(), (req, res) => {
+    // trim empty entries
+    var list = req.body.list;
+    for (var i = 0; i < list.length; i++) {
+        var url = list[i].trim();
+        if (url === "") {
+            list.splice(i, 1);
+            i--;
         } else {
-            var item = parseIngredient(s);
-            if (item) {
-                if (!isDuplicate(ingredients, item)) {
-                    ingredients.push(item);
-                }
-            }
-        }
-    });
-
-    return {
-        title: title,
-        ingredients: ingredients,
-    };
-}
-
-function isDuplicate(a, item) {
-    return a.find(function(e) {
-        return e.amount == item.amount && e.unit == item.unit && e.ingredient == item.ingredient;
-    });
-}
-
-function parseIngredient(s) {
-    s = s.trim();
-    var p = /^([0-9]+(?:\.,[0-9]+)?)\s?([A-zåÅäÄöÖ]+)\s+(.+)/;
-    var m = s.match(p);
-    if (m) {
-        var unit = parseUnit(m[2]);
-        if (unit) {
-            return {
-                amount: parseFloat(m[1]),
-                unit: unit,
-                ingredient: m[3].toLowerCase(),
-            };
+            list[i] = url;
         }
     }
-    return null;
-}
 
-function parseUnit(s) {
-    s = s.toLowerCase();
-    var units = ["l", "dl", "cl", "ml", "kg", "mg", "g"];
-    if (units.indexOf(s) != -1) {
-        return s;
+    parser.scrapeUrls(list).then(function(result) {
+        var id = "" + db.get('job_id')
+            .value();
+        db.update('job_id', n => n + 1)
+            .write();
+
+        db.get('jobs')
+            .push({
+                id: id,
+                data: result,
+            })
+            .write();
+
+        res.redirect('/recipe/' + id);
+    }).catch(function(r) {
+        // TODO
+        console.log(r);
+        res.status(400).send("Error: " + r.error);
+    });
+});
+
+app.get('/recipe/:id', (req, res) => {
+    var job = db.get('jobs')
+        .find({ id: req.params.id })
+        .value();
+
+    if (!job) {
+        res.status(404).send("Not found");
+        return;
     }
-    switch (s) {
-        case "kilo":
-        case "kilogram":
-            return "kg";
-        case "gram":
-            return "g";
-        case "liter":
-            return "l";
-    }
-    return null;
-}
+
+    res.render('recipe', {
+        layout: false,
+        jsonData: JSON.stringify(job),
+    });
+});
+
+app.listen(port, () => {
+
+});

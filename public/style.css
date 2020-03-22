@@ -1,0 +1,8 @@
+main {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+input[type=text] {
+    width: 100%;
+}
