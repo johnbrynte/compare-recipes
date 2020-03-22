@@ -78,6 +78,48 @@ function parseUnit(s) {
     return null;
 }
 
+function combineRecipes(recipes) {
+    var ingredients = [];
+    recipes.forEach(recipe => {
+        recipe.ingredients.forEach(item => {
+            var sList = item.ingredient.split(/\s+/g);
+
+            for (var i = 0; i < ingredients.length; i++) {
+                var ingredient = ingredients[i];
+                var list = ingredient.list;
+                for (var j = 0; j < list.length; j++) {
+                    var _item = list[j];
+                    var _sList = _item.ingredient.split(/\s+/g);
+                    for (var j = 0; j < sList.length; j++) {
+                        var s = sList[j];
+                        for (var k = 0; k < _sList.length; k++) {
+                            var _s = _sList[k];
+                            if (s.search(new RegExp("^" + _s)) != -1
+                                || s.search(new RegExp(_s + "$")) != -1
+                                || _s.search(new RegExp("^" + s)) != -1
+                                || _s.search(new RegExp(s + "$")) != -1) {
+                                // found match
+                                if (item.ingredient != ingredient.name) {
+                                    ingredient.name = null;
+                                }
+                                list.push(item);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // new
+            ingredients.push({
+                name: item.ingredient,
+                list: [item],
+            });
+        });
+    });
+    return ingredients;
+}
+
 function scrapeUrls(sites) {
     var promises = sites.map(function(url) {
         return rp(url).then(function(htmlString) {
@@ -91,5 +133,6 @@ function scrapeUrls(sites) {
 }
 
 module.exports = {
+    combineRecipes: combineRecipes,
     scrapeUrls: scrapeUrls,
 };

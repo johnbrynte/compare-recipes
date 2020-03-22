@@ -45,16 +45,22 @@ app.post('/parse', upload.none(), (req, res) => {
         }
     }
 
-    parser.scrapeUrls(list).then(function(result) {
+    parser.scrapeUrls(list).then(function(recipes) {
         var id = "" + db.get('job_id')
             .value();
         db.update('job_id', n => n + 1)
             .write();
 
+        var combined = parser.combineRecipes(recipes);
+        var data = {
+            combined: combined,
+            recipes: recipes,
+        };
+
         db.get('jobs')
             .push({
                 id: id,
-                data: result,
+                data: data,
             })
             .write();
 

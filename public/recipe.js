@@ -1,11 +1,25 @@
 var data = JSON.parse($('#recipe-data').text());
 var content = $("#content");
 
-data.data.forEach(function(recipe) {
-    content.append($("<h2>").html(recipe.title));
-    content.append($("<a>").attr("href", recipe.url).html(recipe.url));
+data.data.recipes.forEach(function(recipe) {
+    content.append($("<p>").html(recipe.title)
+        .append($("<a>").attr("href", recipe.url).html(recipe.url)));
+});
 
-    recipe.ingredients.forEach(function(item) {
-        content.append($("<p>").html(item.amount + " " + item.unit + " " + item.ingredient));
+data.data.combined.forEach(function(ingredient) {
+    if (ingredient.name) {
+        content.append($("<h3>").html(ingredient.name));
+    } else {
+        var list = [];
+        ingredient.list.forEach(function(item) {
+            list.push(item.ingredient);
+        });
+        content.append($("<h3>").html(list.join(", ")));
+    }
+
+    var list = [];
+    ingredient.list.forEach(function(item) {
+        list.push(item.amount + " " + (item.unit || "st"));
     });
+    content.append($("<p>").html(list.join(", ")));
 });
