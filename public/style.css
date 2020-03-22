@@ -5,6 +5,14 @@ main {
 
 input[type=text] {
     width: 100%;
+    font-size: 1em;
+}
+
+button {
+    outline: none;
+    border: 1px solid lightgrey;
+    margin-top: 10px;
+    font-size: 1em;
 }
 
 #recipe-header {

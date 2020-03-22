@@ -49,25 +49,43 @@ function isDuplicate(a, item) {
 
 function parseIngredient(s) {
     s = s.trim();
-    var p = /^([0-9]+(?:(?:\.|,|\/)[0-9]+)?)\s?([A-zåÅäÄöÖ]+)?\s+(.+)/;
+
+    // var p = /^([0-9]+(?:(?:\.|,|\/)[0-9]+)?)\s?([A-zåÅäÄöÖ]+)?\s+(.+)/;
+
+    // matches [num] ([range num]) ([unit]) 
+    var p = /^((?:[0-9]+\s)?[0-9]+(?:(?:\.|,|\/)[0-9]+)?)(?:\s-\s((?:[0-9]+\s)?[0-9]+(?:(?:\.|,|\/)[0-9]+)?))?\s?([A-zåÅäÄöÖ]+)?\s+(.+)/;
     var m = s.match(p);
+
     if (m) {
-        var unit = parseUnit(m[2]);
-        var amount, amountStr = m[1].replace(",", ".");
-        try {
-            amount = eval(amountStr);
-        } catch (e) {
-            amount = parseFloat(amountStr);
-        }
+        var unit = parseUnit(m[3]);
+        var a1 = parseAmount(m[1]);
+        var a2 = parseAmount(m[2]);
+        var amount = a2 ? (a1 + a2) / 2 : a1;
         return {
             amount: amount,
             unit: unit,
-            ingredient: m[3].toLowerCase(),
+            ingredient: m[4].toLowerCase(),
         };
-        // if (unit) {
-        // }
     }
     return null;
+}
+
+function parseAmount(s) {
+    if (!s) {
+        return null;
+    }
+
+    var parts = s.split(" ");
+    if (parts.length > 1) {
+        return parseAmount(parts[0]) + parseAmount(parts[1]);
+    }
+
+    s = s.replace(",", ".");
+    try {
+        return eval(s);
+    } catch (e) {
+        return parseFloat(s);
+    }
 }
 
 function parseUnit(s) {

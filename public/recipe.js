@@ -2,6 +2,9 @@ var data = JSON.parse($('#recipe-data').text());
 var header = $("#recipe-header");
 var content = $("#content");
 
+var title = data.data.recipes[0].title.split(/(\s?,\s|\s-|\s\|)/)[0].trim();
+header.append($("<h1>").html(title));
+
 data.data.recipes.forEach(function(recipe, i) {
     header.append($("<p>")
         .attr("recipe-id", i + 1)

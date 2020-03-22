@@ -45,6 +45,11 @@ app.post('/parse', upload.none(), (req, res) => {
         }
     }
 
+    if (list.length == 0) {
+        res.redirect("/");
+        return;
+    }
+
     parser.scrapeUrls(list).then(function(recipes) {
         var id = "" + db.get('job_id')
             .value();
@@ -66,9 +71,10 @@ app.post('/parse', upload.none(), (req, res) => {
 
         res.redirect('/recipe/' + id);
     }).catch(function(r) {
-        // TODO
-        console.log(r);
-        res.status(400).send("Error: " + r.error);
+        res.render('error', {
+            layout: false,
+            error: r.error,
+        });
     });
 });
 
@@ -78,13 +84,21 @@ app.get('/recipe/:id', (req, res) => {
         .value();
 
     if (!job) {
-        res.status(404).send("Not found");
+        res.render('not-found', {
+            layout: false,
+        });
         return;
     }
 
     res.render('recipe', {
         layout: false,
         jsonData: JSON.stringify(job),
+    });
+});
+
+app.use((req, res) => {
+    res.render('not-found', {
+        layout: false,
     });
 });
 

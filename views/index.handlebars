@@ -2,7 +2,8 @@
 <html>
 
 <head>
-    <title>Cooking</title>
+    <meta charset="UTF-8">
+    <title>Jämför recept</title>
 
     <link rel="stylesheet" href="/style.css">
 
@@ -11,11 +12,12 @@
 
 <body>
     <main>
-        <h1>Cooking</h1>
+        <h1>Jämför recept</h1>
+        <p>Det här verktyget är till för att kunna jämföra mängden av olika ingredienser mellan recept. Jämför till exempel <a href="javascript:void(test());">recept på pannkakor</a> från Coop och ICA.</p>
         <form method="POST" action="/parse" enctype="multipart/form-data">
             <div id="inputs">
             </div>
-            <input type="submit" value="Parse">
+            <button type="submit">Jämför</button>
         </form>
     </main>
 
