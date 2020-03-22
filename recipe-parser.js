@@ -1,7 +1,7 @@
 const cheerio = require('cheerio');
 const rp = require('request-promise');
 
-function parseRecipe(html) {
+function parseRecipe(html, id) {
     const $ = cheerio.load(html);
 
     var title = $("title").text().trim();
@@ -18,6 +18,13 @@ function parseRecipe(html) {
                 var item = parseIngredient(s);
                 if (item) {
                     score += item.unit ? 2 : 1;
+                    // convert all "null" units to "'st'"
+                    if (!item.unit) {
+                        item.unit = "st";
+                    }
+                    if (id) {
+                        item.id = id;
+                    }
                     list.push(item);
                 }
             }
@@ -42,12 +49,18 @@ function isDuplicate(a, item) {
 
 function parseIngredient(s) {
     s = s.trim();
-    var p = /^([0-9]+(?:\.,[0-9]+)?)\s?([A-zåÅäÄöÖ]+)?\s+(.+)/;
+    var p = /^([0-9]+(?:(?:\.|,|\/)[0-9]+)?)\s?([A-zåÅäÄöÖ]+)?\s+(.+)/;
     var m = s.match(p);
     if (m) {
         var unit = parseUnit(m[2]);
+        var amount, amountStr = m[1].replace(",", ".");
+        try {
+            amount = eval(amountStr);
+        } catch (e) {
+            amount = parseFloat(amountStr);
+        }
         return {
-            amount: parseFloat(m[1]),
+            amount: amount,
             unit: unit,
             ingredient: m[3].toLowerCase(),
         };
@@ -62,7 +75,7 @@ function parseUnit(s) {
         return null;
     }
     s = s.toLowerCase();
-    var units = ["l", "dl", "cl", "ml", "kg", "mg", "g", "tsk"];
+    var units = ["l", "dl", "cl", "ml", "kg", "mg", "g", "msk", "tsk", "krm"];
     if (units.indexOf(s) != -1) {
         return s;
     }
@@ -72,15 +85,81 @@ function parseUnit(s) {
             return "kg";
         case "gram":
             return "g";
+        case "milligram":
+            return "mg";
         case "liter":
             return "l";
+        case "matsked":
+        case "matskedar":
+            return "msk";
+        case "tesked":
+        case "teskedar":
+            return "tsk";
+        case "kryddmått":
+            return "krm";
     }
     return null;
+}
+
+function matchUnits(item1, item2) {
+    if (item1.unit === item2.unit) {
+        return true;
+    }
+    var convertArray = null;
+    var i1, i2;
+
+    // volym
+    var vol = ["ml", "krm", "tsk", "cl", "msk", "dl", "l"];
+    i1 = vol.indexOf(item1.unit);
+    i2 = vol.indexOf(item2.unit);
+    if (i1 != -1 && i2 != -1) {
+        convert = [1, 1, 5, 10, 15, 100, 1000];
+    } else {
+        // vikt
+        var weight = ["mg", "g", "kg"];
+        i1 = weight.indexOf(item1.unit);
+        i2 = weight.indexOf(item2.unit);
+        if (i1 != -1 && i2 != -1) {
+            convert = [1, 1000, 1000000];
+        }
+    }
+
+    if (!convertArray) {
+        return false;
+    }
+
+    var i, j, amount;
+    if (i1 < i2) {
+        i = i1;
+        j = i2;
+        amount = item2.amount;
+    } else {
+        i = i2;
+        j = i1;
+        amount = item1.amount;
+    }
+
+    for (; i < j && j >= 0; j--) {
+        amount *= convertArray[j] / convertArray[j - 1];
+    }
+
+    if (i1 < i2) {
+        item2.amount = amount;
+        item2.unit = item1.unit;
+    } else {
+        item1.amount = amount;
+        item1.unit = item2.unit;
+    }
+
+    return true;
 }
 
 function combineRecipes(recipes) {
     var ingredients = [];
     recipes.forEach(recipe => {
+        if (!recipe) {
+            return;
+        }
         recipe.ingredients.forEach(item => {
             var sList = item.ingredient.split(/\s+/g);
 
@@ -90,20 +169,35 @@ function combineRecipes(recipes) {
                 for (var j = 0; j < list.length; j++) {
                     var _item = list[j];
                     var _sList = _item.ingredient.split(/\s+/g);
-                    for (var j = 0; j < sList.length; j++) {
-                        var s = sList[j];
-                        for (var k = 0; k < _sList.length; k++) {
-                            var _s = _sList[k];
-                            if (s.search(new RegExp("^" + _s)) != -1
-                                || s.search(new RegExp(_s + "$")) != -1
-                                || _s.search(new RegExp("^" + s)) != -1
-                                || _s.search(new RegExp(s + "$")) != -1) {
-                                // found match
-                                if (item.ingredient != ingredient.name) {
-                                    ingredient.name = null;
+                    for (var k = 0; k < sList.length; k++) {
+                        var s = sList[k];
+                        for (var l = 0; l < _sList.length; l++) {
+                            var _s = _sList[l];
+                            try {
+                                if (s.search(new RegExp("^" + _s)) != -1
+                                    || s.search(new RegExp(_s + "$")) != -1
+                                    || _s.search(new RegExp("^" + s)) != -1
+                                    || _s.search(new RegExp(s + "$")) != -1) {
+                                    // found match
+                                    if (matchUnits(item, _item)) {
+                                        if (item.ingredient != ingredient.name) {
+                                            ingredient.name = null;
+                                        }
+                                        list.push(item);
+                                        return;
+                                    }
                                 }
-                                list.push(item);
-                                return;
+                            } catch (e) {
+                                if (s == _s) {
+                                    // found match
+                                    if (matchUnits(item, _item)) {
+                                        if (item.ingredient != ingredient.name) {
+                                            ingredient.name = null;
+                                        }
+                                        list.push(item);
+                                        return;
+                                    }
+                                }
                             }
                         }
                     }
@@ -117,13 +211,26 @@ function combineRecipes(recipes) {
             });
         });
     });
+    // order
+    ingredients.forEach(item => {
+        item.list.sort((a, b) => {
+            return a.amount - b.amount;
+        });
+    });
+    ingredients.sort((a, b) => {
+        var amin = a.list[0].amount;
+        var amax = a.list[a.list.length - 1].amount;
+        var bmin = b.list[0].amount;
+        var bmax = b.list[b.list.length - 1].amount;
+        return ((bmax - bmin) / bmax) - ((amax - amin) / amax);
+    });
     return ingredients;
 }
 
 function scrapeUrls(sites) {
-    var promises = sites.map(function(url) {
+    var promises = sites.map(function(url, i) {
         return rp(url).then(function(htmlString) {
-            var recipe = parseRecipe(htmlString);
+            var recipe = parseRecipe(htmlString, i + 1);
             recipe.url = url;
             return recipe;
         });
@@ -133,6 +240,7 @@ function scrapeUrls(sites) {
 }
 
 module.exports = {
+    matchUnits: matchUnits,
     combineRecipes: combineRecipes,
     scrapeUrls: scrapeUrls,
 };

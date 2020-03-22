@@ -6,3 +6,30 @@ main {
 input[type=text] {
     width: 100%;
 }
+
+#recipe-header {
+    position: sticky;
+    top: 0;
+    background: white;
+    width: 100%;
+    display: table;
+    border-bottom: 1px solid lightgrey;
+}
+
+.meter {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    border: 1px solid lightgrey;
+    box-sizing: border-box;
+}
+
+.meter-range {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+    box-sizing: border-box;
+    background: salmon;
+    color: white;
+    height: 100%;
+}
